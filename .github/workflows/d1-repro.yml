@@ -1,0 +1,285 @@
+# D1 repro: replays the production CI's D1 steps (sandbase-lab/pelican-test
+# deploy.yml + import-seed.yml) against throwaway resources on YOUR OWN
+# Cloudflare account, with the wrangler version you pick.
+#
+#   1. create a temporary D1 (name ci-sandbox-<run id>-<attempt>)
+#   2. apply only 0001 (production today: 0001 applied, 0002/0003 pending)
+#   3. migrations list --remote
+#      (optional: list + apply again with a D1 Read-only token, if configured)
+#   4. migrations apply --remote (0002, 0003; the step that fails in production)
+#   5. d1 execute --remote --file for both seeds
+#   6. read-only row counts against the manifests
+#   7. optional (test_r2): temporary bucket, put/get/sha256/delete
+#   8. always: delete the temporary D1 (and bucket)
+#
+# No Worker is deployed and no production name or id appears anywhere.
+name: D1 repro
+
+on:
+  workflow_dispatch:
+    inputs:
+      wrangler_version:
+        description: "wrangler version (3.99.0 = production CI today; 4.149.0 = latest 4.x)"
+        type: string
+        default: "3.99.0"
+        required: true
+      test_r2:
+        description: "Also round-trip one seed object through a temporary R2 bucket"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# bash -eo pipefail: a failing wrangler call inside a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  repro:
+    name: D1 migrations + seed (wrangler ${{ inputs.wrangler_version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Inputs reach scripts only through env, never inlined into `run:`.
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: "false"
+      # Debug logs show the method and URL of every API call (which endpoint a
+      # version uses for migrations is the point of this repro). Both 3.99 and
+      # 4.x strip the Authorization header before logging; sanitize (default
+      # true, pinned here) also omits all headers and bodies. API errors still
+      # print in full through wrangler's normal error output.
+      WRANGLER_LOG: debug
+      WRANGLER_LOG_SANITIZE: "true"
+      WRANGLER_VERSION: ${{ inputs.wrangler_version }}
+      TEST_R2: ${{ inputs.test_r2 }}
+      RES_NAME: ci-sandbox-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate inputs
+        run: |
+          if [[ ! "$WRANGLER_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::wrangler_version must look like 3.99.0 or 4.149.0"
+            exit 1
+          fi
+          if [[ ! "$RES_NAME" =~ ^[a-z0-9-]{3,63}$ ]]; then
+            echo "::error::unexpected resource name $RES_NAME"
+            exit 1
+          fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::set the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets"
+            exit 1
+          fi
+          echo "wrangler=$WRANGLER_VERSION test_r2=$TEST_R2 resources=$RES_NAME"
+
+      - name: Install wrangler
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          install -m 755 scripts/ci/wr.sh "$RUNNER_TEMP/bin/wr"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          npx --yes "wrangler@$WRANGLER_VERSION" --version
+
+      # Prints only the `status` field ("active" for a usable token). User
+      # tokens answer on /user/tokens/verify; account-owned tokens only on
+      # /accounts/<id>/tokens/verify, so both are tried.
+      - name: Token self-check
+        run: |
+          api=https://api.cloudflare.com/client/v4
+          user="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/user/tokens/verify" | jq -r '.result.status')" || user="request failed"
+          echo "user/tokens/verify: $user"
+          account="$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$api/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify" | jq -r '.result.status')" || account="request failed"
+          echo "accounts/<id>/tokens/verify: $account"
+          if [ "$user" != active ] && [ "$account" != active ]; then
+            echo "::error::token is not active on either verify endpoint"
+            exit 1
+          fi
+
+      # Run from an empty directory so no wrangler version can edit a config
+      # file with the new binding. The id is read from the printed snippet
+      # (TOML in 3.x, JSON in later 4.x) and, failing that, from `d1 list`.
+      - name: Create temporary D1
+        id: create
+        run: |
+          mkdir -p "$RUNNER_TEMP/empty"
+          out="$(cd "$RUNNER_TEMP/empty" && wr d1 create "$RES_NAME" --location apac 2>&1)" || { echo "$out"; exit 1; }
+          echo "$out"
+          uuid='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+          id="$(grep -i 'database_id' <<< "$out" | grep -oE "$uuid" | head -n 1 || true)"
+          if [ -z "$id" ]; then
+            id="$(WR_JSON=1 wr d1 list --json | jq -r --arg n "$RES_NAME" '.[] | select(.name == $n) | .uuid' | head -n 1)"
+          fi
+          if [[ ! "$id" =~ ^$uuid$ ]]; then
+            echo "::error::could not read the new database id"
+            exit 1
+          fi
+          echo "DB_ID=$id" >> "$GITHUB_ENV"
+          echo "database_id=$id"
+
+      # wrangler.stage1.toml points at a directory holding only 0001, so the
+      # database ends up exactly like production: d1_migrations lists 0001.
+      - name: Write temporary wrangler config
+        run: |
+          mkdir -p migrations-stage1
+          cp migrations/0001_lab.sql migrations-stage1/
+          for target in wrangler.toml:migrations wrangler.stage1.toml:migrations-stage1; do
+            sed -e "s/__NAME__/$RES_NAME/" -e "s/__DB_NAME__/$RES_NAME/" -e "s/__DB_ID__/$DB_ID/" \
+              -e "s/__MIGRATIONS_DIR__/${target#*:}/" wrangler.template.toml > "${target%%:*}"
+          done
+          cat wrangler.toml
+          ls migrations migrations-stage1
+
+      - name: Apply 0001 only (simulate production)
+        run: wr d1 migrations apply "$RES_NAME" --remote --config wrangler.stage1.toml
+
+      - name: List remote D1 migrations
+        run: wr d1 migrations list "$RES_NAME" --remote
+
+      # Optional, only when the CLOUDFLARE_API_TOKEN_READONLY secret exists (a
+      # second token with D1 Read only): replays production's exact symptom
+      # (list works, apply fails) to test the "token lacks D1 Edit" theory.
+      # The token reaches this step alone. Never fails the job.
+      - name: Read-only token probe (optional)
+        id: readonly
+        continue-on-error: true
+        env:
+          RO_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_READONLY }}
+        run: |
+          if [ -z "$RO_TOKEN" ]; then
+            echo "CLOUDFLARE_API_TOKEN_READONLY not set; skipping."
+            echo "RO_RESULT=skipped" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          export CLOUDFLARE_API_TOKEN="$RO_TOKEN"
+          wr d1 migrations list "$RES_NAME" --remote || true
+          if wr d1 migrations apply "$RES_NAME" --remote; then
+            echo "RO_RESULT=apply succeeded with the read-only token" >> "$GITHUB_ENV"
+          else
+            echo "RO_RESULT=apply failed with the read-only token (compare its error code with production's 7500)" >> "$GITHUB_ENV"
+          fi
+
+      # Same command as the failing production step.
+      - name: Apply remote D1 migrations
+        id: apply
+        run: wr d1 migrations apply "$RES_NAME" --remote
+
+      # Only after a failed apply, on the throwaway database: which migrations
+      # landed, which columns exist, and whether the bare 0002 SQL runs through
+      # `d1 execute` (separates the SQL from the migrations command).
+      - name: Diagnose failed apply
+        if: failure() && steps.apply.outcome == 'failure'
+        run: |
+          wr d1 execute "$RES_NAME" --remote --command "SELECT id, name, applied_at FROM d1_migrations ORDER BY id" || true
+          wr d1 execute "$RES_NAME" --remote --command "SELECT name FROM pragma_table_info('lab_results')" || true
+          wr d1 execute "$RES_NAME" --remote --yes --file migrations/0002_html_artifact.sql || true
+
+      - name: Import seed watermelon-test
+        run: wr d1 execute "$RES_NAME" --remote --yes --file seed/watermelon-test/seed.sql
+
+      - name: Import seed endless-runner
+        run: wr d1 execute "$RES_NAME" --remote --yes --file seed/endless-runner/seed.sql
+
+      - name: Verify row counts (read-only)
+        run: |
+          sql="SELECT (SELECT COUNT(*) FROM lab_runs) AS runs, (SELECT COUNT(*) FROM lab_results) AS results, (SELECT GROUP_CONCAT(name, ',') FROM (SELECT name FROM d1_migrations ORDER BY id)) AS migrations"
+          got="$(WR_JSON=1 wr d1 execute "$RES_NAME" --remote --json --command "$sql" | jq -c '.[0].results[0]')"
+          want="$(jq -cs '{runs: ([.[].runs[].run_id] | unique | length), results: ([.[].runs[].result_id] | unique | length), migrations: "0001_lab.sql,0002_html_artifact.sql,0003_html_frames.sql"}' seed/watermelon-test/manifest.json seed/endless-runner/manifest.json)"
+          echo "got:  $got"
+          echo "want: $want"
+          if [ "$(jq -S . <<< "$got")" != "$(jq -S . <<< "$want")" ]; then
+            echo "::error::row counts or migrations differ"
+            exit 1
+          fi
+
+      # From the empty directory, like `d1 create`, so no config is edited.
+      - name: Create temporary R2 bucket
+        if: inputs.test_r2
+        run: |
+          echo "BUCKET_CREATED=1" >> "$GITHUB_ENV"
+          cd "$RUNNER_TEMP/empty" && wr r2 bucket create "$RES_NAME"
+
+      # wrangler 3.x has no --remote for r2 object commands (always remote);
+      # 4.x defaults to local storage and needs it. Only objects present in
+      # this repo are tried (two of the seed objects).
+      - name: R2 put / get / sha256 / delete
+        if: inputs.test_r2
+        run: |
+          target=()
+          if wr r2 object put --help 2>&1 | grep -q -- '--remote'; then target=(--remote); fi
+          jq -r '.scene as $s | .objects[] | [.key, "seed/\($s)/\(.file)", .sha256, .content_type] | @tsv' \
+            seed/watermelon-test/manifest.json seed/endless-runner/manifest.json > "$RUNNER_TEMP/objects.tsv"
+          n=0
+          while IFS=$'\t' read -r -u 3 key file sha type; do
+            [ -f "$file" ] || continue
+            wr r2 object put "$RES_NAME/$key" --file "$file" --content-type "$type" "${target[@]}" < /dev/null
+            wr r2 object get "$RES_NAME/$key" --file "$RUNNER_TEMP/got.bin" "${target[@]}" < /dev/null
+            got="$(sha256sum "$RUNNER_TEMP/got.bin" | cut -d' ' -f1)"
+            echo "$key sha256 want=$sha got=$got"
+            if [ "$got" != "$sha" ]; then
+              echo "::error::sha256 mismatch for $key"
+              exit 1
+            fi
+            wr r2 object delete "$RES_NAME/$key" "${target[@]}" < /dev/null
+            n=$((n + 1))
+          done 3< "$RUNNER_TEMP/objects.tsv"
+          if [ "$n" = 0 ]; then
+            echo "::error::no seed objects found in this repo"
+            exit 1
+          fi
+          echo "$n objects round-tripped"
+
+      # Always runs, also after failures or a cancel. Objects first (a bucket
+      # must be empty to delete), then the bucket, then the database.
+      - name: Delete temporary resources
+        if: always()
+        run: |
+          status=0
+          mkdir -p "$RUNNER_TEMP/empty"
+          if [ -n "${BUCKET_CREATED:-}" ]; then
+            target=()
+            if wr r2 object put --help 2>&1 | grep -q -- '--remote'; then target=(--remote); fi
+            if [ -f "$RUNNER_TEMP/objects.tsv" ]; then
+              while IFS=$'\t' read -r -u 3 key file _ _; do
+                [ -f "$file" ] || continue
+                wr r2 object delete "$RES_NAME/$key" "${target[@]}" < /dev/null || true
+              done 3< "$RUNNER_TEMP/objects.tsv"
+            fi
+            if ! (cd "$RUNNER_TEMP/empty" && wr r2 bucket delete "$RES_NAME"); then
+              echo "::error::bucket $RES_NAME not deleted; remove it in the R2 dashboard"
+              status=1
+            fi
+          fi
+          # Tried even without DB_ID: create may have succeeded before the id
+          # could be read. Only a known database makes a failed delete an error.
+          if (cd "$RUNNER_TEMP/empty" && wr d1 delete "$RES_NAME" -y); then
+            echo "database $RES_NAME deleted"
+          elif [ -n "${DB_ID:-}" ]; then
+            echo "::error::database $RES_NAME not deleted; remove it in the D1 dashboard"
+            status=1
+          else
+            echo "no database $RES_NAME to delete"
+          fi
+          exit "$status"
+
+      - name: Summary
+        if: always()
+        env:
+          APPLY: ${{ steps.apply.outcome }}
+          CREATE: ${{ steps.create.outcome }}
+        run: |
+          {
+            echo "### D1 repro, wrangler $WRANGLER_VERSION"
+            echo
+            echo "- create D1: ${CREATE:-skipped}"
+            echo "- read-only token probe: ${RO_RESULT:-not reached}"
+            echo "- migrations apply 0002/0003 (--remote): ${APPLY:-skipped}"
+            echo "- resources: $RES_NAME (deleted in the step above)"
+          } >> "$GITHUB_STEP_SUMMARY"

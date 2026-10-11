@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.state/
+# Generated per run from wrangler.template.toml; never committed.
+wrangler.toml
+wrangler.stage1.toml
+migrations-stage1/
+.env
+.dev.vars

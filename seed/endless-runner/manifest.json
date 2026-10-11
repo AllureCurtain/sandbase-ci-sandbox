@@ -1,0 +1,87 @@
+{
+  "scene": "endless-runner",
+  "schema_migrations": [
+    "0001_lab.sql",
+    "0002_html_artifact.sql",
+    "0003_html_frames.sql"
+  ],
+  "source": {
+    "ref": "origin/main",
+    "runs": [
+      {
+        "report": "bench/out/2026-10-11-03-36-23/report.json",
+        "commit": "78664d6c6c6098143d31ff4e7ca58307c812abd0",
+        "sha256": "cae6b6b1af58c4047572d9349dd95396f8a930909003d01c064cf71f7101f606",
+        "skipped": [
+          "anthropic/claude-opus-5.5",
+          "deepseek/deepseek-v4-pro",
+          "z-ai/glm-5.3"
+        ]
+      },
+      {
+        "report": "bench/out/2026-10-11-03-51-33/report.json",
+        "commit": "78664d6c6c6098143d31ff4e7ca58307c812abd0",
+        "sha256": "f6e13ba9b1b9d1af233bcf3820bc4d2d083fc8b721bdb39b851db1a8eeadf04a",
+        "skipped": [
+          "z-ai/glm-5.3"
+        ]
+      }
+    ]
+  },
+  "note": "cost is the bench estimate (prompt/completion tokens x catalog price, draw + judge), not the amount read back from /tasks/:id/cost; draw_cost/judge_cost, task ids and finished_at were not recorded and stay NULL; no screenshots (endless-runner has no render step)",
+  "runs": [
+    {
+      "run_id": "92e582e7-ae8e-526f-acda-104486d10ebd",
+      "result_id": "22053f31-2b1b-5311-ad99-ad36fba0c8b8",
+      "model": "openai/gpt-6.1-sol",
+      "score": 5,
+      "cost": 0.093332,
+      "cost_source": "estimate",
+      "source": "bench/out/2026-10-11-03-36-23/openai-gpt-6-1-sol.html",
+      "created_at": "2026-10-11T03:36:23.000Z"
+    },
+    {
+      "run_id": "f6fe866e-67ba-5003-8d6d-3b726644dde4",
+      "result_id": "b48556b8-5ea2-532d-98e9-af2b661942d4",
+      "model": "anthropic/claude-opus-5.5",
+      "score": 5,
+      "cost": 0.326815,
+      "cost_source": "estimate",
+      "source": "bench/out/2026-10-11-03-51-33/anthropic-claude-opus-5-5.html",
+      "created_at": "2026-10-11T03:51:33.000Z"
+    },
+    {
+      "run_id": "f6fe866e-67ba-5003-8d6d-3b726644dde4",
+      "result_id": "0882dc68-2955-54db-a457-7e2a9a5b15fa",
+      "model": "deepseek/deepseek-v4-pro",
+      "score": 3.5,
+      "cost": 0.125977,
+      "cost_source": "estimate",
+      "source": "bench/out/2026-10-11-03-51-33/deepseek-deepseek-v4-pro.html",
+      "created_at": "2026-10-11T03:51:33.000Z"
+    }
+  ],
+  "objects": [
+    {
+      "key": "endless-runner/runs/92e582e7-ae8e-526f-acda-104486d10ebd/22053f31-2b1b-5311-ad99-ad36fba0c8b8-game.html",
+      "file": "r2/endless-runner/runs/92e582e7-ae8e-526f-acda-104486d10ebd/22053f31-2b1b-5311-ad99-ad36fba0c8b8-game.html",
+      "content_type": "text/html",
+      "size": 17179,
+      "sha256": "d50fedbcf3f7a85f31f6c9b4b0316ab19c135c6d0823f21ebf632fa8a1878cba"
+    },
+    {
+      "key": "endless-runner/runs/f6fe866e-67ba-5003-8d6d-3b726644dde4/b48556b8-5ea2-532d-98e9-af2b661942d4-game.html",
+      "file": "r2/endless-runner/runs/f6fe866e-67ba-5003-8d6d-3b726644dde4/b48556b8-5ea2-532d-98e9-af2b661942d4-game.html",
+      "content_type": "text/html",
+      "size": 21841,
+      "sha256": "4c0d354f28a6e3f8040db4f0e44e4b50b5b0b80f457b873038847b18f1bac0e9"
+    },
+    {
+      "key": "endless-runner/runs/f6fe866e-67ba-5003-8d6d-3b726644dde4/0882dc68-2955-54db-a457-7e2a9a5b15fa-game.html",
+      "file": "r2/endless-runner/runs/f6fe866e-67ba-5003-8d6d-3b726644dde4/0882dc68-2955-54db-a457-7e2a9a5b15fa-game.html",
+      "content_type": "text/html",
+      "size": 57538,
+      "sha256": "f786854e75ded111541744684087486fec2eb31d68338d9bb6186c57dea2d747"
+    }
+  ]
+}

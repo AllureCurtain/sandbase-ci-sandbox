@@ -1,0 +1,20 @@
+{
+  "name": "sandbase-ci-sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reproduces the production D1 migration and seed import CI steps on a throwaway Cloudflare account.",
+  "type": "module",
+  "scripts": {
+    "check:yaml": "node scripts/check-yaml.mjs",
+    "local:v4": "node scripts/local-repro.mjs 4.149.0",
+    "local:v3": "node scripts/local-repro.mjs 3.99.0",
+    "local": "npm run local:v3 && npm run local:v4"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0",
+    "yaml": "2.9.1"
+  }
+}

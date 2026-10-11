@@ -1,0 +1,7 @@
+# Copied byte for byte from sandbase-lab/pelican-test origin/main; seed objects
+# are checked against manifest.json sha256 sums. Never convert line endings.
+migrations/** -text
+seed/** -text
+# The workflow and its scripts run on Linux runners.
+*.sh text eol=lf
+*.yml text eol=lf

@@ -1,0 +1,13 @@
+# Template for the throwaway config that .github/workflows/d1-repro.yml and
+# scripts/local-repro.mjs write before every run (wrangler.toml and
+# wrangler.stage1.toml, both gitignored). Only D1 commands read it: there is no
+# `main`, no routes and nothing here is ever deployed. Every placeholder is
+# replaced per run; names carry the run id, so no two runs share a resource.
+name = "__NAME__"
+compatibility_date = "2025-05-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "__DB_NAME__"
+database_id = "__DB_ID__"
+migrations_dir = "__MIGRATIONS_DIR__"

@@ -1,0 +1,101 @@
+{
+  "scene": "watermelon-test",
+  "schema_migrations": [
+    "0001_lab.sql",
+    "0002_html_artifact.sql",
+    "0003_html_frames.sql"
+  ],
+  "exported_at": "2026-10-11T05:45:32.230Z",
+  "dropped_source_columns": {
+    "lab_runs": [
+      "hidden_reason"
+    ],
+    "lab_results": [
+      "finish_reason",
+      "truncated",
+      "raw_key",
+      "gen_params"
+    ]
+  },
+  "note": "raw model text (.txt) is not exported",
+  "runs": [
+    {
+      "run_id": "e2117fd1-448c-4b65-aff4-54bee261c869",
+      "result_id": "58a2ee41-3db8-43c5-a670-aaafb5ba4506",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "score": 4,
+      "draw_cost": 0.029803,
+      "judge_cost": 0.007762,
+      "cost": 0.037565,
+      "created_at": "2026-10-10T06:19:06.018Z"
+    },
+    {
+      "run_id": "fcffed7c-99e0-4443-9c35-27a3e3779df1",
+      "result_id": "18045b76-28cd-493a-ae58-c6cfe75116ad",
+      "model": "anthropic/claude-sonnet-5.5",
+      "score": 4,
+      "draw_cost": 0.412718,
+      "judge_cost": 0.006583,
+      "cost": 0.419301,
+      "created_at": "2026-10-10T06:26:22.079Z"
+    }
+  ],
+  "objects": [
+    {
+      "key": "watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy-1.png",
+      "file": "r2/watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy-1.png",
+      "content_type": "image/png",
+      "size": 500838,
+      "sha256": "fe3ec45ba8fb8257611de6ea33fe51db8972d11b72262bf79c391313480e59b4"
+    },
+    {
+      "key": "watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy-2.png",
+      "file": "r2/watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy-2.png",
+      "content_type": "image/png",
+      "size": 554688,
+      "sha256": "85aac9d9540bd3b7045ef5530544c3fbe502b1126c95562dc668358a534269e0"
+    },
+    {
+      "key": "watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy-3.png",
+      "file": "r2/watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy-3.png",
+      "content_type": "image/png",
+      "size": 229269,
+      "sha256": "e2908850f96fff377f746432d9e9ef8a144315eee5d362f4a1173bfcd85abbda"
+    },
+    {
+      "key": "watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy.html",
+      "file": "r2/watermelon-test/runs/e2117fd1-448c-4b65-aff4-54bee261c869/58a2ee41-3db8-43c5-a670-aaafb5ba4506-toy.html",
+      "content_type": "text/html; charset=utf-8",
+      "size": 26405,
+      "sha256": "afc20bcb512c1ceffb44911cdca37f9cd8f9c63fdd8d82b2e63adb5c2ec5448d"
+    },
+    {
+      "key": "watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy-1.png",
+      "file": "r2/watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy-1.png",
+      "content_type": "image/png",
+      "size": 886765,
+      "sha256": "6add87e955281521762aa0ebedea4856a08e1fd09bee54f0bd39fbde9b6afab9"
+    },
+    {
+      "key": "watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy-2.png",
+      "file": "r2/watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy-2.png",
+      "content_type": "image/png",
+      "size": 891810,
+      "sha256": "94d5eb5afcb2d913807d197fab0e7c3d6ae2723043126b6c6ea9a0033dbc7752"
+    },
+    {
+      "key": "watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy-3.png",
+      "file": "r2/watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy-3.png",
+      "content_type": "image/png",
+      "size": 906289,
+      "sha256": "27994de9b95e9b40b8e3fb6007fcffaecb37c6947b5c2d20b59c37870620bfd9"
+    },
+    {
+      "key": "watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy.html",
+      "file": "r2/watermelon-test/runs/fcffed7c-99e0-4443-9c35-27a3e3779df1/18045b76-28cd-493a-ae58-c6cfe75116ad-toy.html",
+      "content_type": "text/html; charset=utf-8",
+      "size": 29701,
+      "sha256": "95740a58ce2cd1bcb6baf229386e4324bf8e9022640c7402467f5627e0a5d7bc"
+    }
+  ]
+}
